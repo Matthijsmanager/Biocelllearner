@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Celonderdelen Game</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #2196F3;
+            --bg-color: #f0f4f8;
+            --text-color: #333;
+            --success-color: #4CAF50;
+            --error-color: #F44336;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: var(--secondary-color);
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        p.instructions {
+            text-align: center;
+            max-width: 800px;
+            margin-bottom: 20px;
+            color: #555;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 1000px;
+            width: 100%;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        @media (min-width: 768px) {
+            .game-container {
+                flex-direction: row;
+            }
+        }
+
+        .labels-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .label {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: grab;
+            user-select: none;
+            font-weight: bold;
+            text-align: center;
+            transition: transform 0.2s, background-color 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        }
+
+        .label:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+        
+        .label.dragging {
+            opacity: 0.5;
+        }
+
+        .cell-diagram {
+            flex: 2;
+            position: relative;
+            background-color: #e8f5e9;
+            border-radius: 50%;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-width: 500px;
+            margin: 0 auto;
+            border: 5px solid #a5d6a7;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+        }
+
+        /* Abstract Cell Drawing */
+        .organelle-shape {
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        /* Nucleus */
+        .nucleus-shape {
+            width: 25%;
+            height: 25%;
+            background-color: #ce93d8;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 3px solid #ab47bc;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+        
+        /* Mitochondria */
+        .mitochondria-shape {
+            width: 15%;
+            height: 8%;
+            background-color: #ffcc80;
+            border: 2px solid #ff9800;
+            border-radius: 40%;
+        }
+        .m1 { top: 20%; left: 30%; transform: rotate(45deg); }
+        .m2 { bottom: 25%; right: 20%; transform: rotate(-30deg); }
+
+        /* Vacuole (Plant-like representation for clarity) */
+        .vacuole-shape {
+            width: 30%;
+            height: 20%;
+            background-color: #bbdefb;
+            top: 20%;
+            right: 15%;
+            border: 2px solid #64b5f6;
+            border-radius: 40% 60% 50% 40%;
+        }
+
+        /* Chloroplast (Bladgroenkorrel) */
+        .chloroplast-shape {
+            width: 12%;
+            height: 8%;
+            background-color: #81c784;
+            border: 2px solid #4caf50;
+            border-radius: 40%;
+        }
+        .c1 { bottom: 30%; left: 20%; transform: rotate(15deg); }
+        .c2 { top: 40%; right: 10%; transform: rotate(-15deg); }
+
+        /* Endoplasmic Reticulum (ER) */
+        .er-shape {
+            width: 40%;
+            height: 40%;
+            border: 4px dashed #ffab91;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            pointer-events: none; /* Let clicks pass through */
+        }
+
+        /* Drop Zones */
+        .drop-zone {
+            position: absolute;
+            width: 100px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 2px dashed #999;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            color: #666;
+            z-index: 10;
+        }
+
+        .drop-zone.drag-over {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+            transform: scale(1.05);
+        }
+
+        .drop-zone.correct {
+            background-color: var(--success-color);
+            border-color: #388E3C;
+            color: white;
+            border-style: solid;
+        }
+
+        /* Drop Zone Positions based on absolute percentages of the cell-diagram */
+        #drop-celmembraan { bottom: 5%; left: 50%; transform: translateX(-50%); }
+        #drop-cytoplasma { top: 35%; left: 10%; }
+        #drop-celkern { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #drop-mitochondrion { top: 15%; left: 35%; }
+        #drop-vacuole { top: 15%; right: 15%; }
+        #drop-bladgroenkorrel { bottom: 25%; left: 15%; }
+
+
+        .status-panel {
+            margin-top: 20px;
+            text-align: center;
+            width: 100%;
+        }
+
+        #message {
+            font-size: 1.2em;
+            font-weight: bold;
+            min-height: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        button.reset-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button.reset-btn:hover {
+            background-color: #388E3C;
+        }
+
+        /* Info Box */
+        .info-box {
+            margin-top: 20px;
+            background: #e3f2fd;
+            border-left: 5px solid var(--secondary-color);
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            max-width: 800px;
+            display: none; /* Hidden initially */
+        }
+        
+        .info-box.visible {
+            display: block;
+        }
+        
+        .info-title {
+            font-weight: bold;
+            color: #1565C0;
+            margin-bottom: 5px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Biologie: De Cel Game</h1>
+    <p class="instructions">Sleep de namen van de celonderdelen naar de juiste plek in de (plantaardige) cel om te leren wat hun functie is.</p>
+
+    <div class="game-container">
+        <div class="labels-container" id="labels-container">
+            <!-- Labels worden via JS gegenereerd -->
+        </div>
+
+        <div class="cell-diagram" id="cell-diagram">
+            <!-- Abstracte weergave van organellen -->
+            <div class="organelle-shape er-shape"></div>
+            <div class="organelle-shape nucleus-shape"></div>
+            <div class="organelle-shape mitochondria-shape m1"></div>
+            <div class="organelle-shape mitochondria-shape m2"></div>
+            <div class="organelle-shape vacuole-shape"></div>
+            <div class="organelle-shape chloroplast-shape c1"></div>
+            <div class="organelle-shape chloroplast-shape c2"></div>
+
+            <!-- Drop Zones -->
+            <div class="drop-zone" id="drop-celmembraan" data-target="celmembraan">Celmembraan</div>
+            <div class="drop-zone" id="drop-cytoplasma" data-target="cytoplasma">Cytoplasma</div>
+            <div class="drop-zone" id="drop-celkern" data-target="celkern">Celkern</div>
+            <div class="drop-zone" id="drop-mitochondrion" data-target="mitochondrion">Mitochondriën</div>
+            <div class="drop-zone" id="drop-vacuole" data-target="vacuole">Vacuole</div>
+            <div class="drop-zone" id="drop-bladgroenkorrel" data-target="bladgroenkorrel">Bladgroenkorrels</div>
+        </div>
+    </div>
+
+    <div class="status-panel">
+        <div id="message"></div>
+        <button class="reset-btn" onclick="resetGame()">Opnieuw Spelen</button>
+    </div>
+
+    <div class="info-box" id="info-box">
+        <div class="info-title" id="info-title"></div>
+        <div id="info-desc"></div>
+    </div>
+
+    <script>
+        // Data voor de celonderdelen
+        const organelles = [
+            { id: 'celmembraan', name: 'Celmembraan', desc: 'Een dun vliesje dat de cel omgeeft. Het regelt welke stoffen de cel in- en uitgaan (selectief doorlaatbaar).' },
+            { id: 'cytoplasma', name: 'Cytoplasma', desc: 'Een stroperige vloeistof (vooral water met opgeloste stoffen) waarin de celorganellen drijven. Hier vinden veel processen plaats.' },
+            { id: 'celkern', name: 'Celkern', desc: 'Het \'regelcentrum\' van de cel. Hierin ligt het DNA (erfelijk materiaal) opgeslagen dat de activiteiten in de cel bestuurt.' },
+            { id: 'mitochondrion', name: 'Mitochondriën', desc: 'De \'energiecentrales\' van de cel. Hier vindt verbranding plaats, waardoor energie vrijkomt voor de cel.' },
+            { id: 'vacuole', name: 'Vacuole', desc: 'Een met vocht gevuld blaasje, vooral groot in plantencellen. Slaat stoffen op en zorgt voor stevigheid van de cel.' },
+            { id: 'bladgroenkorrel', name: 'Bladgroenkorrel', desc: 'Plastiden in plantencellen waarin fotosynthese plaatsvindt. Ze geven planten hun groene kleur en maken glucose (voeding) met behulp van zonlicht.' }
+        ];
+
+        let score = 0;
+
+        function initGame() {
+            const labelsContainer = document.getElementById('labels-container');
+            labelsContainer.innerHTML = '';
+            
+            // Schud de labels (fisher-yates shuffle)
+            const shuffledOrganelles = [...organelles].sort(() => Math.random() - 0.5);
+
+            shuffledOrganelles.forEach(org => {
+                const label = document.createElement('div');
+                label.classList.add('label');
+                label.draggable = true;
+                label.id = `label-${org.id}`;
+                label.dataset.id = org.id;
+                label.textContent = org.name;
+                
+                // Drag Events
+                label.addEventListener('dragstart', dragStart);
+                label.addEventListener('dragend', dragEnd);
+                
+                // Touch Events voor mobiel
+                label.addEventListener('touchstart', handleTouchStart, {passive: false});
+                label.addEventListener('touchmove', handleTouchMove, {passive: false});
+                label.addEventListener('touchend', handleTouchEnd, {passive: false});
+
+                labelsContainer.appendChild(label);
+            });
+
+            // Setup Drop Zones
+            const dropZones = document.querySelectorAll('.drop-zone');
+            dropZones.forEach(zone => {
+                zone.textContent = 'Sleep hier...';
+                zone.classList.remove('correct');
+                
+                // Reset drop zone attributes for a new game
+                zone.dataset.filled = "false";
+                
+                // Drag Over Events
+                zone.addEventListener('dragover', dragOver);
+                zone.addEventListener('dragenter', dragEnter);
+                zone.addEventListener('dragleave', dragLeave);
+                zone.addEventListener('drop', drop);
+            });
+
+            score = 0;
+            document.getElementById('message').textContent = '';
+            document.getElementById('message').style.color = 'var(--text-color)';
+            document.getElementById('info-box').classList.remove('visible');
+        }
+
+        // --- Drag & Drop Functies (Desktop) ---
+        function dragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            setTimeout(() => {
+                e.target.classList.add('dragging');
+            }, 0);
+        }
+
+        function dragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function dragOver(e) {
+            e.preventDefault(); // Noodzakelijk om drop toe te staan
+        }
+
+        function dragEnter(e) {
+            e.preventDefault();
+            if (e.target.dataset.filled !== "true") {
+                e.target.classList.add('drag-over');
+            }
+        }
+
+        function dragLeave(e) {
+            e.target.classList.remove('drag-over');
+        }
+
+        function drop(e) {
+            e.preventDefault();
+            e.target.classList.remove('drag-over');
+            
+            if (e.target.dataset.filled === "true") return;
+
+            const draggedId = e.dataTransfer.getData('text/plain');
+            handleMatch(draggedId, e.target);
+        }
+
+        // --- Touch Functies (Mobiel) ---
+        let currentDrag = null;
+
+        function handleTouchStart(e) {
+            const touch = e.touches[0];
+            currentDrag = e.target;
+            currentDrag.classList.add('dragging');
+            // Store initial position just in case
+            currentDrag.dataset.startX = touch.clientX;
+            currentDrag.dataset.startY = touch.clientY;
+        }
+
+        function handleTouchMove(e) {
+            if (!currentDrag) return;
+            e.preventDefault(); // Voorkom scrollen tijdens slepen
+            
+            const touch = e.touches[0];
+            // We kunnen het element daadwerkelijk verplaatsen met transform, 
+            // maar voor deze simpele game is het voldoende om visueel feedback te geven via CSS .dragging
+            // Om de dropzone te vinden tijdens touchmove:
+            const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            // Verwijder drag-over van alle zones
+            document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('drag-over'));
+            
+            if (dropTarget && dropTarget.classList.contains('drop-zone') && dropTarget.dataset.filled !== "true") {
+                dropTarget.classList.add('drag-over');
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!currentDrag) return;
+            
+            const touch = e.changedTouches[0];
+            const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            currentDrag.classList.remove('dragging');
+            document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('drag-over'));
+            
+            if (dropTarget && dropTarget.classList.contains('drop-zone') && dropTarget.dataset.filled !== "true") {
+                handleMatch(currentDrag.dataset.id, dropTarget);
+            }
+            
+            currentDrag = null;
+        }
+
+        // --- Game Logica ---
+        function handleMatch(draggedId, dropZone) {
+            const targetId = dropZone.dataset.target;
+
+            if (draggedId === targetId) {
+                // Correct!
+                const labelElement = document.getElementById(`label-${draggedId}`);
+                const orgData = organelles.find(o => o.id === draggedId);
+                
+                dropZone.textContent = orgData.name;
+                dropZone.classList.add('correct');
+                dropZone.dataset.filled = "true";
+                
+                // Verwijder het label uit de lijst
+                labelElement.remove();
+                
+                // Toon informatie
+                showInfo(orgData);
+                
+                score++;
+                checkWin();
+            } else {
+                // Fout
+                showMessage("Helaas, dat is niet de juiste plek. Probeer het nog eens!", "var(--error-color)");
+                
+                // Korte schud-animatie voor foute gok (simpel)
+                dropZone.style.transform = "translateX(-10px)";
+                setTimeout(() => dropZone.style.transform = "translateX(10px)", 100);
+                setTimeout(() => dropZone.style.transform = "translateX(0)", 200);
+            }
+        }
+
+        function showInfo(orgData) {
+            const infoBox = document.getElementById('info-box');
+            document.getElementById('info-title').textContent = orgData.name;
+            document.getElementById('info-desc').textContent = orgData.desc;
+            infoBox.classList.add('visible');
+            showMessage("Goed gedaan!", "var(--success-color)");
+        }
+
+        function showMessage(text, color) {
+            const msgEl = document.getElementById('message');
+            msgEl.textContent = text;
+            msgEl.style.color = color;
+        }
+
+        function checkWin() {
+            if (score === organelles.length) {
+                showMessage("Gefeliciteerd! Je hebt alle onderdelen van de cel gevonden!", "var(--success-color)");
+                document.getElementById('info-title').textContent = "Missie Voltooid!";
+                document.getElementById('info-desc').textContent = "Je kent nu de belangrijkste onderdelen van een cel. Goed gewerkt!";
+            }
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        // Start het spel bij laden
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>
